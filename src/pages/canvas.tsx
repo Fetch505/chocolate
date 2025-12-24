@@ -25,7 +25,7 @@ interface HandlePosition {
 }
 
 const Canvas = forwardRef<any, { shape: string; color: string; filling: string; onSelectionChange?: (item: TextItem | null) => void }>(
-  ({ shape, color, filling, onSelectionChange }, ref) => {
+  ({ shape, color, onSelectionChange }, ref) => {
     const svgRef = useRef<SVGSVGElement>(null)
     const [items, setItems] = useState<TextItem[]>([])
     const [selectedId, setSelectedId] = useState<string | null>(null)
@@ -67,7 +67,6 @@ const Canvas = forwardRef<any, { shape: string; color: string; filling: string; 
 
       const svg = svgRef.current
       const rect = svg.getBoundingClientRect()
-      const viewBox = svg.viewBox.baseVal
 
       // Find text element in SVG
       const textEl = svg.querySelector(`[data-id="${item.id}"] text`)
@@ -87,7 +86,9 @@ const Canvas = forwardRef<any, { shape: string; color: string; filling: string; 
         pt.x = x
         pt.y = y
         const world = pt.matrixTransform(ctm)
-        const screen = world.matrixTransform(svg.getScreenCTM())
+        const screenCTM = svg.getScreenCTM()
+        if (!screenCTM) return { x: 0, y: 0 }
+        const screen = world.matrixTransform(screenCTM)
         return { x: screen.x - rect.left, y: screen.y - rect.top }
       }
 
@@ -283,14 +284,6 @@ const Canvas = forwardRef<any, { shape: string; color: string; filling: string; 
       }
     }
 
-    const handleTextMouseDown = (e: React.PointerEvent<SVGSVGElement>, itemId: string) => {
-      e.preventDefault()
-      if (e.button !== 0) return
-      setDraggingId(itemId)
-      setDragStart({ x: e.clientX, y: e.clientY })
-      setSelectedId(itemId)
-    }
-
     const handleMouseMove = (e: React.PointerEvent<SVGSVGElement>) => {
       if (draggingId) {
         const item = items.find((i) => i.id === draggingId)
@@ -305,12 +298,13 @@ const Canvas = forwardRef<any, { shape: string; color: string; filling: string; 
         const pt0 = svg.createSVGPoint()
         pt0.x = 0
         pt0.y = 0
-        const origin = pt0.matrixTransform(svg.getScreenCTM()?.inverse())
+        const screenCTM = svg.getScreenCTM()
+        const origin = screenCTM ? pt0.matrixTransform(screenCTM.inverse()) : pt0
 
         const pt1 = svg.createSVGPoint()
         pt1.x = dx
         pt1.y = dy
-        const moved = pt1.matrixTransform(svg.getScreenCTM()?.inverse())
+        const moved = screenCTM ? pt1.matrixTransform(screenCTM.inverse()) : pt1
 
         const newX = item.x + (moved?.x || 0) - (origin?.x || 0)
         const newY = item.y + (moved?.y || 0) - (origin?.y || 0)
